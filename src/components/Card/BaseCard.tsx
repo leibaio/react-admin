@@ -1,9 +1,6 @@
 import { HTMLAttributes } from "react";
 
-interface Props extends HTMLAttributes<unknown> {
-}
-
-function BaseCard(props: Props) {
+function BaseCard(props: HTMLAttributes<unknown>) {
   const { children, className } = props;
 
   return (
@@ -11,7 +8,6 @@ function BaseCard(props: Props) {
       { ...props }
       id="card"
       className={`
-        min-w-980px
         h-full
         box-border
         overflow-auto
@@ -19,7 +15,7 @@ function BaseCard(props: Props) {
         box-border
         px-5
         py-3
-        rounded-5
+        rounded-3
         ${className}
       `}
     >

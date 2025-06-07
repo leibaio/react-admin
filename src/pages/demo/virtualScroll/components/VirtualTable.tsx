@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import BaseTable from '@/components/Table/BaseTable';
 
 function VirtualTable() {
+   
   const { t } = useTranslation();
 
-  const columns: TableColumn = [
+  const columns: TableColumn[] = [
     { title: 'ID', dataIndex: 'id', width: 200 },
     { title: t('public.name'), dataIndex: 'name', width: 200 },
     { title: t('system.phone'), dataIndex: 'phone', width: 200 },

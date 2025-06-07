@@ -1,18 +1,15 @@
 import type { MenuProps } from 'antd';
 import type { SideMenu } from '#/public';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Menu } from 'antd';
 import { Icon } from '@iconify/react';
-import { setTitle } from '@/utils/helper';
 import { useTranslation } from 'react-i18next';
 import { useCommonStore } from '@/hooks/useCommonStore';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useMenuStore, useTabsStore } from '@/stores';
+import { useMenuStore } from '@/stores';
 import {
   filterMenus,
   getFirstMenu,
-  getMenuByKey,
-  getMenuName,
   getOpenMenuByRouter,
   handleFilterMenus,
   splitPath
@@ -29,16 +26,6 @@ function LayoutMenu() {
   const currentLanguage = i18n.language;
 
   const {
-    addTabs,
-    setNav,
-    setActiveKey
-  } = useTabsStore(state => state);
-  const {
-    setOpenKeys,
-    setSelectedKeys,
-    toggleCollapsed
-  } = useMenuStore(state => state);
-  const {
     isMaximize,
     isCollapsed,
     isPhone,
@@ -47,31 +34,16 @@ function LayoutMenu() {
     permissions,
     menuList
   } = useCommonStore();
+  const { toggleCollapsed } = useMenuStore(state => state);
+  const [currentOpenKeys, setCurrentOpenKeys] = useState(openKeys || []);
+  const [currentSelectedKeys, setCurrentSelectedKeys] = useState(selectedKeys ? [selectedKeys] : []);
 
   // 处理默认展开
   useEffect(() => {
     const newOpenKey = getOpenMenuByRouter(pathname);
-    if (!isPhone && !isCollapsed) {
-      setOpenKeys(newOpenKey);
-      setSelectedKeys(pathname);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setCurrentOpenKeys(newOpenKey);
+    setCurrentSelectedKeys([pathname]);
   }, [pathname]);
-
-  /**
-   * 设置浏览器标签
-   * @param list - 菜单列表
-   * @param path - 路径
-   */
-  const handleSetTitle = useCallback((list: SideMenu[], path: string) => {
-    const title = getMenuName(list, path, i18n.language);
-    if (title) setTitle(t, title);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    handleSetTitle(menuList, pathname);
-  }, [pathname, menuList, handleSetTitle]);
 
   /**
    * 转换菜单icon格式
@@ -106,22 +78,20 @@ function LayoutMenu() {
    */
   const goPath = (path: string) => {
     navigate(path);
-    const menuByKeyProps = { menus, permissions, key: path };
-    const newTab = getMenuByKey(menuByKeyProps);
-    if (newTab) {
-      setActiveKey(newTab.key);
-      setNav(newTab.nav);
-      addTabs(newTab);
-    }
   };
 
   /**
    * 点击菜单
    * @param e - 菜单事件
    */
-  const onClick: MenuProps['onClick'] = e => {
-    goPath(e.key);
+  const onClickMenu: MenuProps['onClick'] = e => {
+    // 如果点击的菜单是当前菜单则退出
+    if (e.key === pathname) return;
+
+    setCurrentSelectedKeys([e.key]);
     if (isPhone) hiddenMenu();
+
+    goPath(e.key);
   };
 
   /**
@@ -147,24 +117,26 @@ function LayoutMenu() {
    * @param openKeys - 展开键值
    */
   const onOpenChange = (openKeys: string[]) => {
-    const newOpenKey: string[] = [];
-    let last = ''; // 最后一个目录结构
+    startTransition(() => {
+      const newOpenKey: string[] = [];
+      let last = ''; // 最后一个目录结构
 
-    // 当目录有展开值
-    if (openKeys.length > 0) {
-      last = openKeys[openKeys.length - 1];
-      const lastArr: string[] = splitPath(last);
-      newOpenKey.push(last);
+      // 当目录有展开值
+      if (openKeys.length > 0) {
+        last = openKeys[openKeys.length - 1];
+        const lastArr: string[] = splitPath(last);
+        newOpenKey.push(last);
 
-      // 对比当前展开目录是否是同一层级
-      for (let i = openKeys.length - 2; i >= 0; i--) {
-        const arr = splitPath(openKeys[i]);
-        const hasOpenKey = diffOpenMenu(arr, lastArr);
-        if (hasOpenKey) newOpenKey.unshift(openKeys[i]);
+        // 对比当前展开目录是否是同一层级
+        for (let i = openKeys.length - 2; i >= 0; i--) {
+          const arr = splitPath(openKeys[i]);
+          const hasOpenKey = diffOpenMenu(arr, lastArr);
+          if (hasOpenKey) newOpenKey.unshift(openKeys[i]);
+        }
       }
-    }
 
-    setOpenKeys(newOpenKey);
+      setCurrentOpenKeys(newOpenKey);
+    });
   };
 
   /** 点击logo */
@@ -179,7 +151,7 @@ function LayoutMenu() {
     toggleCollapsed(true);
   };
 
-  return (
+  return useMemo(() => (
     <>
       <div
         className={`
@@ -227,13 +199,14 @@ function LayoutMenu() {
         <Menu
           id="layout-menu"
           className="z-1000"
-          selectedKeys={[selectedKeys]}
-          openKeys={openKeys}
+          selectedKeys={currentSelectedKeys}
+          openKeys={currentOpenKeys}
           mode="inline"
           theme="dark"
-          inlineCollapsed={isCollapsed}
+          forceSubMenuRender
+          inlineCollapsed={isPhone ? false : isCollapsed}
           items={handleFilterMenus(menus)}
-          onClick={onClick}
+          onClick={onClickMenu}
           onOpenChange={onOpenChange}
         />
       </div>
@@ -254,7 +227,15 @@ function LayoutMenu() {
         />
       }
     </>
-  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [
+    currentOpenKeys,
+    currentSelectedKeys,
+    isCollapsed,
+    isMaximize,
+    isPhone,
+    menus,
+  ]);
 }
 
 export default LayoutMenu;

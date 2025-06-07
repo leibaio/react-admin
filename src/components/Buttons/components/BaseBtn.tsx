@@ -1,13 +1,14 @@
+import type { ReactNode } from 'react';
 import type { ButtonProps } from 'antd';
 import { Button } from 'antd';
 
-interface Props extends Omit<ButtonProps, 'loading'> {
-  isLoading: boolean;
-  children?: JSX.Element | string;
+interface Props extends ButtonProps {
+  isLoading?: boolean;
+  children?: ReactNode;
 }
 
 function BaseBtn(props: Props) {
-  const { isLoading, children } = props;
+  const { isLoading, loading, children, className } = props;
 
   // 清除自定义属性
   const params: Partial<Props> = { ...props };
@@ -17,7 +18,8 @@ function BaseBtn(props: Props) {
     <Button
       type='primary'
       {...params}
-      loading={!!isLoading}
+      className={`${className} small-btn`}
+      loading={!!isLoading || loading}
     >
       { children }
     </Button>

@@ -1,67 +1,68 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { debounce } from 'lodash';
 import * as echarts from 'echarts';
-import { useCommonStore } from './useCommonStore';
 /**
  * 使用Echarts
  * @param options -  绘制echarts的参数
  * @param data -  数据
  */
 export const useEcharts = (options: echarts.EChartsCoreOption, data?: unknown) => {
-  const { isRefresh } = useCommonStore();
-  const [isInit, setInit] = useState(false);
-  const echartsRef = useRef<echarts.EChartsType>();
+  const echartsRef = useRef<echarts.EChartsType | null>(null);
   const htmlDivRef = useRef<HTMLDivElement>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   /** 销毁echarts */
   const dispose = () => {
     if (htmlDivRef.current) {
       echartsRef.current?.dispose();
+      echartsRef.current = null;
+    }
+    if (resizeObserverRef.current) {
+      resizeObserverRef.current.disconnect();
+      resizeObserverRef.current = null;
     }
   };
 
   /** 初始化 */
   const init = useCallback(() => {
-    setInit(false);
-    if (options) {
+    if (options && htmlDivRef.current) {
       // 摧毁echarts后在初始化
       dispose();
 
       // 初始化chart
-      if (htmlDivRef.current) {
-        echartsRef.current = echarts.init(htmlDivRef.current);
-        echartsRef.current.setOption(options, true);
-      }
+      echartsRef.current = echarts.init(htmlDivRef.current);
+      echartsRef.current.setOption(options);
+
+      // 使用 ResizeObserver 监听容器尺寸变化
+      resizeObserverRef.current = new ResizeObserver(
+        debounce(() => {
+          echartsRef.current?.resize({
+            animation: {
+              duration: 500,
+            }
+          });
+        }, 50)
+      );
+      resizeObserverRef.current.observe(htmlDivRef.current);
     }
   }, [options]);
 
   useEffect(() => {
-    if (isInit) init();
-  }, [init, isInit]);
+    if (htmlDivRef.current) {
+      init();
 
-  // 刷新页面监听操作值
-  useEffect(() => {
-    if (options && isRefresh) {
-      setInit(true);
+      return () => {
+        dispose();
+      };
     }
-  }, [options, isRefresh]);
-
-  useEffect(() => {
-    init();
-    window.addEventListener("resize", init, false);
-
-    return () => {
-      window.removeEventListener("resize", init);
-      dispose();
-    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (data) {
-      echartsRef?.current?.setOption(options, true);
+    if (data && echartsRef.current) {
+      echartsRef?.current?.setOption(options);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [data, options]);
 
-  return [htmlDivRef, init] as const;
+  return [htmlDivRef, echartsRef.current] as const;
 };

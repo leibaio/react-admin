@@ -1,10 +1,13 @@
 import type { ResizeCallbackData } from 'react-resizable';
-import type { ColumnsType, ColumnType } from 'antd/es/table';
-import { type TableProps, Table, Button, message } from 'antd';
-import { useMemo, useState, useEffect, useRef } from 'react';
+import type { ColumnsType } from 'antd/es/table';
+import type { TableColumn } from '#/public';
+import { type TableProps, Table, Button, message, Tooltip } from 'antd';
+import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react';
 import { useFiler } from './hooks/useFiler';
-import { PlusOutlined, RedoOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
+import { EMPTY_VALUE } from '@/utils/config';
+import { useCommonStore } from '@/hooks/useCommonStore';
+import { PlusOutlined, RedoOutlined } from '@ant-design/icons';
 import { getTableHeight, handleRowHeight, filterTableColumns } from './utils/helper';
 import ResizableTitle from './components/ResizableTitle';
 import useVirtualTable from './hooks/useVirtual';
@@ -23,8 +26,8 @@ interface Props extends Omit<TableProps<object>, 'bordered'> {
   isCreate?: boolean;
   scrollX?: number;
   scrollY?: number;
-  leftContent?: JSX.Element; // 左侧额外内容
-  rightContent?: JSX.Element; // 右侧额外内容
+  leftContent?: ReactNode; // 左侧额外内容
+  rightContent?: ReactNode; // 右侧额外内容
   getPage?: () => void;
   onCreate?: () => void;
 }
@@ -48,8 +51,9 @@ function BaseTable(props: Props) {
     onCreate
   } = props;
   const { t } = useTranslation();
+  const { isPhone } = useCommonStore();
   const [handleFilterTable] = useFiler();
-  const [columns, setColumns] = useState(filterTableColumns(props.columns as ColumnsType<object>));
+  const [columns, setColumns] = useState(filterTableColumns(props.columns as TableColumn[]));
   const tableRef = useRef<HTMLDivElement>(null);
   const [tableFilters, setTableFilters] = useState<string[]>([]);
 
@@ -60,9 +64,10 @@ function BaseTable(props: Props) {
   delete params.isCreate;
   delete params.isBordered;
   delete params.isOperate;
+  delete (params as TableColumn).enum;
 
   useEffect(() => {
-    setColumns(filterTableColumns(props.columns as ColumnsType<object>));
+    setColumns(filterTableColumns(props.columns as TableColumn[]));
   }, [props.columns]);
 
   // 添加新增缺少方法警告
@@ -110,19 +115,69 @@ function BaseTable(props: Props) {
   // 合并列表
   const mergeColumns = () => {
     const newColumns = handleFilterTable(columns, tableFilters);
+    if (!newColumns) return [];
     const result = newColumns.map((col, index) => ({
-      onCell: () => {
+      ...col,
+      ellipsis: col.ellipsis ?? true,
+      // 手机端去除列固定，除非设置了isKeepFixed
+      fixed: col?.fixed && !(isPhone && !(col as TableColumn)?.isKeepFixed) ? col.fixed : false,
+      onHeaderCell: (column: object, i: number) => ({
+        ...col?.onHeaderCell?.(column, i),
+        width: col.width,
+        onResize: handleResize(index),
+      }),
+      onCell: (data: object, index?: number) => {
         return {
+          ...col?.onCell?.(data, index),
           style: {
+            ...col?.onCell?.(data, index)?.style,
+            maxWidth: col.width,
             width: col.width,
           }
         };
       },
-      ...col,
-      onHeaderCell: (column: ColumnType<object>) => ({
-        width: column.width,
-        onResize: handleResize(index),
-      }),
+      render: (value: unknown, record: object, index: number) => {
+        const renderContent = col?.render?.(value, record, index);
+        let showValue: ReactNode | string = renderContent as ReactNode;
+        let color: string | undefined = undefined;
+        const enumList = (col as TableColumn)?.enum;
+
+        if (enumList && typeof enumList === 'object') {
+          if (Array.isArray(enumList)) {
+            for (let i = 0; i < enumList?.length; i++) {
+              const item = enumList[i];
+              if (String(item.value) === String(showValue)) {
+                showValue = item.label;
+                color = item.color;
+                break;
+              }
+            }
+          } else {
+            for (const key in enumList) {
+              if (key === String(showValue)) {
+                showValue = enumList[key] as string;
+                break;
+              }
+            }
+          }
+        }
+
+        if (!['object', 'function'].includes(typeof renderContent)) {
+          return (
+            <Tooltip title={showValue} placement='topLeft'>
+              <span
+                style={{ color }}
+                className='break-all'
+                title={showValue as string}
+              >
+                { String(showValue ?? EMPTY_VALUE) }
+              </span>
+            </Tooltip>
+          );
+        }
+
+        return renderContent;
+      },
     }));
 
     return result;
@@ -188,12 +243,12 @@ function BaseTable(props: Props) {
       {
         isOperate &&
         <div className='flex justify-between !mb-10px'>
-          <div className='flex flex-wrap items-center'>
+          <div className='flex flex-wrap items-center gap-6px'>
             {
               !!isCreate &&
               <Button
                 type="primary"
-                className='mr-10px'
+                className='small-btn'
                 icon={<PlusOutlined />}
                 onClick={onCreate}
               >
@@ -203,17 +258,23 @@ function BaseTable(props: Props) {
             { leftContent }
           </div>
 
-          <div className='flex flex-wrap items-center'>
-            { rightContent ? <div className='mr-10px'>{ rightContent }</div> : undefined }
+          <div className='flex flex-wrap items-center justify-end gap-6px'>
+            { rightContent ? <div>{ rightContent }</div> : undefined }
 
-            <RedoOutlined
-              className="mr-10px transform rotate-270 cursor-pointer"
-              disabled={!!isLoading}
+            <Button
+              className='small-btn'
+              icon={
+                <RedoOutlined
+                  className="transform rotate-270"
+                  disabled={!!isLoading}
+                />
+              }
               onClick={getPage}
-            />
+            >
+              { t('public.refresh') }
+            </Button>
 
             <TableFilter
-              className='mr-10px'
               columns={columns}
               getTableChecks={getTableChecks}
             />

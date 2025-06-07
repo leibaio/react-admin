@@ -1,5 +1,5 @@
 import type { MenuProps } from 'antd';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   RedoOutlined,
@@ -7,7 +7,7 @@ import {
   VerticalAlignTopOutlined,
   VerticalAlignMiddleOutlined
 } from '@ant-design/icons';
-import { getMenuByKey } from '@/menus/utils/helper';
+import { useAliveController } from 'react-activation';
 import { useCommonStore } from '@/hooks/useCommonStore';
 import { useTabsStore } from '@/stores';
 
@@ -29,15 +29,14 @@ export function useDropdownMenu(props: Props) {
   const { t } = useTranslation();
   const { activeKey, onOpenChange, handleRefresh } = props;
   const { pathname } = useLocation();
-  const { tabs, permissions, menuList } = useCommonStore();
+  const { dropScope } = useAliveController();
+  const { tabs } = useCommonStore();
   const {
     closeLeft,
     closeOther,
     closeRight,
     closeTabs,
-    setNav
   } = useTabsStore(state => state);
-  const navigate = useNavigate();
 
   // 菜单项
   const items: (key?: string) => MenuProps['items'] = (key = activeKey) => {
@@ -89,46 +88,22 @@ export function useDropdownMenu(props: Props) {
 
       // 关闭当前
       case ITabEnums.CLOSE_CURRENT:
-        closeTabs(key);
+        closeTabs(key, dropScope);
         break;
 
       // 关闭其他
       case ITabEnums.CLOSE_OTHER:
-        closeOther(key);
+        closeOther(key, dropScope);
         break;
 
       // 关闭左侧
       case ITabEnums.CLOSE_LEFT:
-        closeLeft(key);
-        if (pathname !== key) {
-          const menuByKeyProps = {
-            menus: menuList,
-            permissions,
-            key
-          };
-          const newItems = getMenuByKey(menuByKeyProps);
-          if (newItems?.key) {
-            navigate(key);
-            setNav(newItems.nav);
-          }
-        }
+        closeLeft(key, dropScope);
         break;
 
       // 关闭右侧
       case ITabEnums.CLOSE_RIGHT:
-        closeRight(key);
-        if (pathname !== key) {
-          const menuByKeyProps = {
-            menus: menuList,
-            permissions,
-            key
-          };
-          const newItems = getMenuByKey(menuByKeyProps);
-          if (newItems?.key) {
-            navigate(key);
-            setNav(newItems.nav);
-          }
-        }
+        closeRight(key, dropScope);
         break;
 
       default:

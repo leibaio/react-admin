@@ -3,15 +3,22 @@ import { Button, App } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { ExclamationCircleOutlined, DeleteOutlined } from '@ant-design/icons';
 
-interface Props extends Omit<ButtonProps, 'loading'> {
-  isLoading: boolean;
+interface Props extends ButtonProps {
+  isLoading?: boolean;
   name?: string;
   isIcon?: boolean;
   handleDelete: () => void;
 }
 
 function DeleteBtn(props: Props) {
-  const { isLoading, isIcon, name, handleDelete } = props;
+  const {
+    isLoading,
+    loading,
+    isIcon,
+    name,
+    className,
+    handleDelete
+  } = props;
   const { t } = useTranslation();
   const { modal } = App.useApp();
 
@@ -40,8 +47,9 @@ function DeleteBtn(props: Props) {
       danger
       type='primary'
       {...params}
+      className={`${className} small-btn`}
       icon={params?.icon || (isIcon && <DeleteOutlined />)}
-      loading={!!isLoading}
+      loading={!!isLoading || loading}
       onClick={showConfirm}
     >
       { name || t('public.delete') }

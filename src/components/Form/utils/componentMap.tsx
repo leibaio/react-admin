@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import type { ComponentType, FormList } from '#/form';
+import type { ComponentType, BaseFormList } from '#/form';
 import { initCompProps } from './helper';
 import { CreateBusiness } from '@/components/Business';
 import {
@@ -11,7 +11,8 @@ import {
   Switch,
   Rate,
   Slider,
-  Upload
+  Upload,
+  type InputProps
 } from 'antd';
 import {
   BaseDatePicker,
@@ -61,20 +62,28 @@ CreateBusiness();
  * 获取组件
  * @param item - 表单项
  */
-export function getComponent(t: TFunction, item: FormList, onPressEnter: () => void) {
+export function getComponent(t: TFunction, item: BaseFormList, onPressEnter: () => void) {
   const { component, componentProps } = item;
+
+  // 输入框渲染
+  const renderInput = (
+    <Input
+      {...(initCompProps(t, 'Input', onPressEnter) as InputProps)}
+      {...(componentProps as InputProps)}
+    />
+  );
 
   // 当组件类型为自定义时
   if (component === 'customize') {
     const { render } = item;
     // 获取组件自定义渲染失败直接返回空标签
-    if (!render) return <></>;
+    if (!render) return renderInput;
     addComponent('customize', render);
   }
 
   const Comp = componentMap.get(component);
   // 获取组件失败直接返回空标签
-  if (!Comp) return <></>;
+  if (!Comp) return renderInput;
 
   return (
     <>
@@ -82,12 +91,6 @@ export function getComponent(t: TFunction, item: FormList, onPressEnter: () => v
         {...initCompProps(t, component, onPressEnter)}
         {...componentProps}
       />
-      {
-        item.unit &&
-        <span className='ml-5px whitespace-nowrap'>
-          { item.unit }
-        </span>
-      }
     </>
   );
 }

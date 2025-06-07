@@ -1,27 +1,31 @@
-import type { LegacyRef, ReactNode } from 'react';
-import type { FormData, FormList } from '#/form';
+import type { CSSProperties, ReactNode, Ref } from 'react';
+import type { BaseFormData, BaseFormList } from '#/form';
 import type { ColProps, FormInstance } from 'antd';
 import { forwardRef, useEffect } from 'react';
 import { FormProps } from 'antd';
 import { Form } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { getComponent } from './utils/componentMap';
-import { filterFormItem, handleValuePropName } from './utils/helper';
+import { filterEmptyStr, filterFormItem, handleValuePropName } from './utils/helper';
 import { filterDayjs } from '../Dates/utils/helper';
 
 interface Props extends FormProps {
-  list: FormList[];
-  data: FormData;
+  list: BaseFormList[];
+  data: BaseFormData;
+  style?: CSSProperties;
+  className?: string;
   children?: ReactNode;
   labelCol?: Partial<ColProps>;
   wrapperCol?: Partial<ColProps>;
   handleFinish: FormProps['onFinish'];
 }
 
-const BaseForm = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
+const BaseForm = forwardRef((props: Props, ref: Ref<FormInstance>) => {
   const {
     list,
     data,
+    style,
+    className,
     children,
     labelCol,
     wrapperCol,
@@ -65,7 +69,9 @@ const BaseForm = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
   const onFinish: FormProps['onFinish'] = values => {
     if (handleFinish) {
       // 将dayjs类型转为字符串
-      const params = filterDayjs(values, list);
+      let params = filterDayjs(values, list);
+      // 过滤空字符串和前后空格
+      params = filterEmptyStr(params);
       handleFinish?.(params);
     }
   };
@@ -78,14 +84,27 @@ const BaseForm = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
     console.warn('表单错误:', errorInfo);
   };
 
+  /**
+   * 渲染表单项
+   * @param item - 表单项
+   */
+  const renderFormItem = (item: BaseFormList) => (
+    <Form.Item
+      {...filterFormItem(item)}
+      valuePropName={handleValuePropName(item.component)}
+    >
+      { getComponent(t, item, onPressEnter) }
+    </Form.Item>
+  );
+
   return (
-    <div>
+    <div className={className} style={style}>
       <Form
         {...formProps}
         ref={ref}
         form={form}
         labelCol={labelCol ? labelCol : { span: 6 }}
-        wrapperCol={wrapperCol ? wrapperCol : { span: 15 }}
+        wrapperCol={wrapperCol ? wrapperCol : { span: 18 }}
         initialValues={data}
         validateMessages={validateMessages}
         onFinish={onFinish}
@@ -94,17 +113,22 @@ const BaseForm = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
       >
         {
           list?.map(item => (
-            <Form.Item
-              {...filterFormItem(item)}
-              key={`${item.name}`}
-              label={item.label}
-              name={item.name}
-              rules={!item.hidden ? item.rules : []}
-              className={item.hidden ? '!hidden' : ''}
-              valuePropName={handleValuePropName(item.component)}
-            >
-              { getComponent(t, item, onPressEnter) }
-            </Form.Item>
+            <div key={`${item.name}`}>
+              {
+                !item?.unit &&
+                <>{ renderFormItem(item) }</>
+              }
+
+              {
+                item.unit &&
+                <Form.Item label={item.label}>
+                  { renderFormItem({ ...item, noStyle: true }) }
+                  <span className='ml-5px whitespace-nowrap'>
+                    { item.unit }
+                  </span>
+                </Form.Item>
+              }
+            </div>
           ))
         }
 

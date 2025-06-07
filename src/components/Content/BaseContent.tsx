@@ -1,8 +1,9 @@
+import type { ReactNode } from 'react';
 import Forbidden from '@/pages/403';
 
 interface Props {
   isPermission?: boolean;
-  children: JSX.Element | JSX.Element[] | string | string[];
+  children: ReactNode;
 }
 
 function BaseContent(props: Props) {
@@ -21,7 +22,7 @@ function BaseContent(props: Props) {
       }
       {
         isPermission === false &&
-        <div className="min-w-980px h-full p-10px box-border overflow-auto">
+        <div className="h-full p-10px box-border overflow-auto">
           <Forbidden />
         </div>
       }

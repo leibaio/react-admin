@@ -1,29 +1,26 @@
 import type { LoginData } from './model';
 import type { FormProps } from 'antd';
-import type { SideMenu } from '#/public';
-import { usePublicStore, type ThemeType } from '@/stores/public';
-import { message } from 'antd';
+import { Checkbox, message } from 'antd';
 import { Form, Button, Input } from 'antd';
-import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { PASSWORD_RULE, THEME_KEY } from '@/utils/config';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '@/servers/login';
-import { useToken } from '@/hooks/useToken';
+import { setTitle } from '@/utils/helper';
 import { getMenuList } from '@/servers/system/menu';
-import { useCommonStore } from '@/hooks/useCommonStore';
 import { getPermissions } from '@/servers/permissions';
+import { encryption, decryption } from '@south/utils';
 import { getFirstMenu } from '@/menus/utils/helper';
-import { useMenuStore, useUserStore } from '@/stores';
 import Logo from '@/assets/images/logo.svg';
-import I18n from '@/components/I18n';
+
+const CHECK_REMEMBER = 'remember-me';
+const USER_USERNAME = 'login-username';
+const USER_PASSWORD = 'login-password';
 
 function Login() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const [form] = Form.useForm();
   const [getToken, setToken] = useToken();
   const [isLoading, setLoading] = useState(false);
+  const [isRemember, setRemember] = useState(true);
   const [messageApi, contextHolder] = message.useMessage();
   const { search } = useLocation();
   const { permissions, menuList } = useCommonStore();
@@ -54,8 +51,26 @@ function Login() {
         handleGoMenu(permissions);
       }
     }
+
+    // 如果存在记住我缓存
+    const remember = localStorage.getItem(CHECK_REMEMBER);
+    setRemember(remember !== 'false');
+
+    // 如果存在账号密码缓存，则自动填充
+    const username = localStorage.getItem(USER_USERNAME);
+    const password = localStorage.getItem((USER_PASSWORD));
+    if (username && password) {
+      const newPassword = decryption(password);
+      form.setFieldsValue({ username, password: newPassword.value });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 语言切换修改title
+  useEffect(() => {
+    setTitle(t, t('login.login'));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i18n.language]);
 
   /** 获取用户权限 */
   const getUserPermissions = async () => {
@@ -134,6 +149,10 @@ function Login() {
       if (Number(code) !== 200) return;
       const { token, user, permissions } = data;
 
+      // 处理记住我逻辑
+      const passwordObj = { value: values.password, expire: 0 };
+      handleRemember(values.username, encryption(passwordObj));
+
       if (!permissions?.length || !token) {
         return messageApi.error({ content: t('login.notPermissions'), key: 'permissions' });
       }
@@ -155,6 +174,30 @@ function Login() {
     console.error('错误信息:', errors);
   };
 
+  /** 点击记住我 */
+  const onRemember = () => {
+    setRemember(!isRemember);
+    localStorage.setItem(CHECK_REMEMBER, isRemember ? 'false' : 'true');
+  };
+
+  /**
+   * 记住我逻辑
+   */
+  const handleRemember = (username: string, password: string) => {
+    if (isRemember) {
+      localStorage.setItem(USER_USERNAME, username);
+      localStorage.setItem(USER_PASSWORD, password);
+    } else {
+      localStorage.removeItem(USER_USERNAME);
+      localStorage.removeItem(USER_PASSWORD);
+    }
+  };
+
+  /** 点击忘记密码 */
+  const onForgetPassword = () => {
+    navigate(`/forget${search}`);
+  };
+
   return (
     <>
       { contextHolder }
@@ -164,35 +207,38 @@ function Login() {
         h-screen
         relative
       `}>
-        <div className="absolute top-5 right-5">
+        <div className="flex absolute top-5 right-5">
           <I18n />
+          <Theme />
         </div>
         <div className={`
-          w-300px
-          h-290px
-          p-30px
-          rounded-5px
           ${themeCache === 'dark' ? 'bg-black bg-dark-200' : 'bg-white'}
+          w-340px
+          p-1.8rem
+          rounded-10px
           box-border
           absolute
           left-1/2
           top-1/2
           -translate-x-1/2
           -translate-y-1/2
+          shadow-[2px_5px_20px_rgba(0,0,0,0.1)]
         `}>
-         <div className="pb-30px pt-10px flex items-center justify-center">
+         <div className="pb-20px pt-10px flex items-center justify-center">
             <img
               className="mr-2 object-contain"
-              width="30"
-              height="30"
+              width="32"
+              height="32"
               src={Logo}
               alt="LOGO"
             />
-            <span className="text-xl font-bold tracking-2px">
+            <span className="text-22px font-bold tracking-2px">
               { t('login.systemLogin') }
             </span>
           </div>
           <Form
+            form={form}
+            layout="vertical"
             name="horizontal_login"
             autoComplete="on"
             onFinish={handleFinish}
@@ -202,44 +248,65 @@ function Login() {
               password: 'admin123456'
             }}
           >
+            <div className='text-#AAA6A6 text-14px mb-8px'>
+              { t('login.username') }
+            </div>
+
             <Form.Item
               name="username"
+              className="!mb-15px"
               rules={[{ required: true, message: t('public.pleaseEnter', { name: t('login.username') }) }]}
             >
               <Input
                 allow-clear="true"
-                placeholder={t('login.username')}
-                data-test="username"
+                placeholder={t('public.pleaseEnter', { name: t('login.username') })}
                 autoComplete="username"
-                addonBefore={<UserOutlined className='change' />}
               />
             </Form.Item>
 
+            <div className='text-#AAA6A6 text-14px mb-8px'>
+              { t('login.password') }
+            </div>
+
             <Form.Item
               name="password"
+              className="!mb-15px"
               rules={[
                 { required: true, message: t('public.pleaseEnter', { name: t('login.password') }) },
                 PASSWORD_RULE(t)
               ]}
             >
               <Input.Password
-                placeholder={t('login.password')}
+                placeholder={t('public.pleaseEnter', { name: t('login.password') })}
                 autoComplete="current-password"
-                addonBefore={<LockOutlined className='change' />}
               />
             </Form.Item>
 
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                className="w-full mt-5px rounded-5px tracking-2px"
-                loading={isLoading}
-              >
-                { t('login.login') }
-              </Button>
-            </Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="w-full mt-15px mb-25px rounded-5px tracking-2px"
+              loading={isLoading}
+            >
+              { t('login.login') }
+            </Button>
           </Form>
+
+          <div className='flex justify-between items-center mb-5px px-1px'>
+            <Checkbox
+              checked={isRemember}
+              onChange={onRemember}
+            >
+              { t('login.rememberMe') }
+            </Checkbox>
+
+            <div
+              className="text-blue-500 cursor-pointer"
+              onClick={onForgetPassword}
+            >
+              { t('login.forgetPassword') }
+            </div>
+          </div>
         </div>
       </div>
     </>

@@ -1,19 +1,27 @@
 import type { SelectProps, TreeSelectProps } from "antd";
 import type { ServerResult } from "@south/request";
 
-export type ApiFn = (params?: object, params2?: object, params3?: object) => Promise<ServerResult<unknown>>
+export type ApiFn = (params?: object | unknown[]) => Promise<ServerResult<unknown>>
 
 // api参数
 interface ApiParam {
   api?: ApiFn;
-  params?: object;
-  params2?: object;
-  params3?: object;
+  params?: object | unknown[];
   apiResultKey?: string;
 }
 
-// ApiSelect
+// 带分页的api参数
+interface ApiPageParam extends Omit<ApiParam, 'params'> {
+  pageSizeKey?: string;
+  pageKey?: string;
+  pageSize?: number;
+  params?: object & {
+    [key: string]: number;
+  }
+}
+
 export type ApiSelectProps = ApiParam & SelectProps
 
-// ApiTreeSelect
 export type ApiTreeSelectProps = ApiParam & TreeSelectProps
+
+export type ApiPageSelectProps = ApiPageParam & SelectProps

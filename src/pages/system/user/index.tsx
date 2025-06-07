@@ -1,15 +1,7 @@
-import type { FormData } from '#/form';
 import type { DataNode } from 'antd/es/tree';
 import type { Key, TableRowSelection } from 'antd/es/table/interface';
-import type { PagePermission } from '#/public';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { createList, searchList, tableColumns } from './model';
 import { type FormInstance, Button, message } from 'antd';
-import { useTranslation } from 'react-i18next';
-import { checkPermission } from '@/utils/permissions';
-import { useCommonStore } from '@/hooks/useCommonStore';
-import { ADD_TITLE, EDIT_TITLE, INIT_PAGINATION } from '@/utils/config';
-import { UpdateBtn, DeleteBtn } from '@/components/Buttons';
+import { createList, searchList, tableColumns } from './model';
 import { getPermission, savePermission } from '@/servers/system/menu';
 import {
   batchDeleteUser,
@@ -19,13 +11,6 @@ import {
   getUserPage,
   updateUser
 } from '@/servers/system/user';
-import BaseContent from '@/components/Content/BaseContent';
-import BaseSearch from '@/components/Search/BaseSearch';
-import BaseModal from '@/components/Modal/BaseModal';
-import BaseForm from '@/components/Form/BaseForm';
-import BaseTable from '@/components/Table/BaseTable';
-import BasePagination from '@/components/Pagination/BasePagination';
-import BaseCard from '@/components/Card/BaseCard';
 import PermissionDrawer from './components/PermissionDrawer';
 
 // 当前行数据
@@ -49,12 +34,12 @@ function Page() {
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState(ADD_TITLE(t));
   const [createId, setCreateId] = useState('');
-  const [createData, setCreateData] = useState<FormData>(initCreate);
-  const [searchData, setSearchData] = useState<FormData>({});
+  const [createData, setCreateData] = useState<BaseFormData>(initCreate);
+  const [searchData, setSearchData] = useState<BaseFormData>({});
   const [page, setPage] = useState(INIT_PAGINATION.page);
   const [pageSize, setPageSize] = useState(INIT_PAGINATION.pageSize);
   const [total, setTotal] = useState(0);
-  const [tableData, setTableData] = useState<FormData[]>([]);
+  const [tableData, setTableData] = useState<BaseFormData[]>([]);
 
   const [promiseId, setPromiseId] = useState('');
   const [isPromiseVisible, setPromiseVisible] = useState(false);
@@ -85,8 +70,8 @@ function Page() {
       const { code, data } = await getUserPage(params);
       if (Number(code) !== 200) return;
       const { items, total } = data;
-      setTotal(total);
-      setTableData(items);
+      setTotal(total || 0);
+      setTableData(items || []);
     } finally {
       setFetch(false);
       setLoading(false);
@@ -101,7 +86,7 @@ function Page() {
    * 点击搜索
    * @param values - 表单返回数据
    */
-  const onSearch = (values: FormData) => {
+  const onSearch = (values: BaseFormData) => {
     setPage(1);
     setSearchData(values);
     setFetch(true);
@@ -110,7 +95,8 @@ function Page() {
   // 首次进入自动加载接口数据
   useEffect(() => {
     if (pagePermission.page) getPage();
-  }, [getPage, pagePermission.page]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagePermission.page]);
 
   /** 开启权限 */
   const openPermission = async (id: string) => {
@@ -171,7 +157,7 @@ function Page() {
       setCreateTitle(EDIT_TITLE(t, id));
       setCreateId(id);
       setCreateLoading(true);
-      const { code, data } = await getUserById(id as string);
+      const { code, data } = await getUserById(id);
       if (Number(code) !== 200) return;
       setCreateData(data);
     } finally {
@@ -193,7 +179,7 @@ function Page() {
    * 新增/编辑提交
    * @param values - 表单返回数据
    */
-  const handleCreate = async (values: FormData) => {
+  const handleCreate = async (values: BaseFormData) => {
     try {
       setCreateLoading(true);
       const functions = () => createId ? updateUser(createId, values) : createUser(values);
@@ -214,7 +200,7 @@ function Page() {
   const onDelete = async (id: string) => {
     try {
       setLoading(true);
-      const { code, message } = await deleteUser(id as string);
+      const { code, message } = await deleteUser(id);
       if (Number(code) === 200) {
         messageApi.success(message || t('public.successfullyDeleted'));
         getPage();
@@ -280,8 +266,7 @@ function Page() {
       {
         pagePermission.permission === true &&
         <Button
-          className='mr-2'
-          loading={isLoading}
+          className='mr-2 small-btn'
           onClick={() => openPermission((record as RowData).id)}
         >
           { t('system.permissions') }
@@ -291,7 +276,6 @@ function Page() {
         pagePermission.update === true &&
         <UpdateBtn
           className='mr-5px'
-          isLoading={isLoading}
           onClick={() => onUpdate((record as RowData).id)}
         />
       }
@@ -299,7 +283,6 @@ function Page() {
         pagePermission.delete === true &&
         <DeleteBtn
           className='mr-5px'
-          isLoading={isLoading}
           handleDelete={() => onDelete((record as RowData).id)}
         />
       }
@@ -308,15 +291,12 @@ function Page() {
 
   /** 左侧渲染 */
   const leftContentRender = (
-    <>
-      <DeleteBtn
-        isIcon
-        isLoading={isLoading}
-        name={t('public.batchDelete')}
-        handleDelete={handleBatchDelete}
-      />
-      <div className='ml-10px'>左侧demo</div>
-    </>
+    <DeleteBtn
+      isIcon
+      isLoading={isLoading}
+      name={t('public.batchDelete')}
+      handleDelete={handleBatchDelete}
+    />
   );
 
   return (
@@ -326,6 +306,7 @@ function Page() {
         <BaseSearch
           list={searchList(t)}
           data={searchData}
+          type='grid'
           isLoading={isLoading}
           handleFinish={onSearch}
         />
@@ -339,7 +320,7 @@ function Page() {
           dataSource={tableData}
           rowSelection={rowSelection}
           leftContent={leftContentRender}
-          rightContent={<div>右侧demo</div>}
+          rightContent={<div>demo</div>}
           getPage={getPage}
           onCreate={onCreate}
         />

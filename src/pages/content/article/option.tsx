@@ -1,30 +1,12 @@
-import type { FormData } from '#/form';
-import type { PagePermission } from '#/public';
 import { type FormInstance, message, Spin } from 'antd';
 import { createList } from './model';
 import { getUrlParam } from '@/utils/helper';
-import { useLocation } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { checkPermission } from '@/utils/permissions';
-import { useCommonStore } from '@/hooks/useCommonStore';
-import { useSingleTab } from '@/hooks/useSingleTab';
-import { usePublicStore, useTabsStore } from '@/stores';
-import { addComponent } from '@/components/Form/utils/componentMap';
-import {
-  useEffect,
-  useRef,
-  useState
-} from 'react';
+import { useAliveController } from 'react-activation';
 import {
   getArticleById,
   createArticle,
   updateArticle,
 } from '@/servers/content/article';
-import BaseForm from '@/components/Form/BaseForm';
-import BaseContent from '@/components/Content/BaseContent';
-import SubmitBottom from '@/components/Bottom/SubmitBottom';
-import BaseCard from '@/components/Card/BaseCard';
-import WangEditor from '@/components/WangEditor';
 
 interface RecordType {
   key: string;
@@ -57,12 +39,17 @@ function Page() {
   const createFormRef = useRef<FormInstance>(null);
   const [isLoading, setLoading] = useState(false);
   const [createId, setCreateId] = useState('');
-  const [createData, setCreateData] = useState<FormData>(initCreate);
+  const [createData, setCreateData] = useState<BaseFormData>(initCreate);
   const [messageApi, contextHolder] = message.useMessage();
   const { permissions } = useCommonStore();
+  const { dropScope } = useAliveController();
   const closeTabGoNext = useTabsStore(state => state.closeTabGoNext);
   const setRefreshPage = usePublicStore(state => state.setRefreshPage);
-  useSingleTab(fatherPath);
+  useSingleTab({
+    fatherPath,
+    zhTitle: id ? '编辑文章管理' : '新增文章管理',
+    enTitle: id ? 'Edit Article Management' : 'Add Article Management',
+  });
 
   // 权限前缀
   const permissionPrefix = '/content/article';
@@ -74,12 +61,16 @@ function Page() {
   };
 
   useEffect(() => {
-    id ? handleUpdate(id) : handleCreate();
+    if (id) {
+      handleUpdate(id);
+    } else {
+      handleCreate();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 异步添加富文本组件
-  useEffect(() => {
+  useLayoutEffect(() => {
     addComponent('RichEditor', WangEditor);
   }, []);
 
@@ -97,7 +88,7 @@ function Page() {
     try {
       setCreateId(id);
       setLoading(true);
-      const { code, data } = await getArticleById(id as string);
+      const { code, data } = await getArticleById(id);
       if (Number(code) !== 200) return;
       setCreateData(data);
     } finally {
@@ -119,7 +110,8 @@ function Page() {
     if (isRefresh) setRefreshPage(true);
     closeTabGoNext({
       key: uri,
-      nextPath: fatherPath
+      nextPath: fatherPath,
+      dropScope
     });
   };
 
@@ -127,7 +119,7 @@ function Page() {
    * 新增/编辑提交
    * @param values - 表单返回数据
    */
-  const handleFinish = async (values: FormData) => {
+  const handleFinish = async (values: BaseFormData) => {
     try {
       setLoading(true);
       const functions = () => createId ? updateArticle(createId, values) : createArticle(values);
@@ -144,19 +136,21 @@ function Page() {
   return (
     <BaseContent isPermission={id ? pagePermission.update : pagePermission.create}>
       { contextHolder }
-      <BaseCard>
-        <div className='mb-50px'>
-          <Spin spinning={isLoading}>
-            <BaseForm
-              ref={createFormRef}
-              list={createList(t)}
-              data={createData}
-              labelCol={{ span: 5 }}
-              handleFinish={handleFinish}
-            />
-          </Spin>
-        </div>
-      </BaseCard>
+      <div className='!h-[calc(100vh-98px)] '>
+        <BaseCard>
+          <div className='mb-50px'>
+            <Spin spinning={isLoading}>
+              <BaseForm
+                ref={createFormRef}
+                list={createList(t)}
+                data={createData}
+                labelCol={{ span: 5 }}
+                handleFinish={handleFinish}
+              />
+            </Spin>
+          </div>
+        </BaseCard>
+      </div>
 
       <SubmitBottom
         isLoading={isLoading}

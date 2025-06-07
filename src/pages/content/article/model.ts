@@ -1,11 +1,8 @@
-import type { FormList, SearchList } from "#/form";
 import type { TFunction } from "i18next";
-import type { TableColumn, TableOptions } from '#/public';
-import { FORM_REQUIRED } from '@/utils/config';
 import CustomizeInput from './components/CustomizeInput';
 
 // 搜索数据
-export const searchList = (t: TFunction): SearchList[] => [
+export const searchList = (t: TFunction): BaseSearchList[] => [
   {
     label: t('login.username'),
     name: 'username',
@@ -22,19 +19,17 @@ export const searchList = (t: TFunction): SearchList[] => [
  * 表格数据
  * @param optionRender - 渲染操作函数
  */
-export const tableColumns = (t: TFunction, optionRender: TableOptions<object>): TableColumn => {
+export const tableColumns = (t: TFunction, optionRender: TableOptions<object>): TableColumn[] => {
   return [
     {
       title: 'ID',
       dataIndex: 'id',
       width: 400,
-      fixed: 'left'
     },
     {
       title: t('login.username'),
       dataIndex: 'username',
       width: 400,
-      fixed: 'left'
     },
     {
       title: t('public.title'),
@@ -57,11 +52,12 @@ export const tableColumns = (t: TFunction, optionRender: TableOptions<object>): 
 };
 
 // 新增数据
-export const createList = (t: TFunction): FormList[] => [
+export const createList = (t: TFunction): BaseFormList[] => [
   {
     label: t('login.username'),
     name: 'username',
     rules: FORM_REQUIRED,
+    extra: '这是描述，这是描述，这是描述。',
     component: 'Input',
     componentProps: {
       style: {
@@ -75,7 +71,6 @@ export const createList = (t: TFunction): FormList[] => [
     rules: FORM_REQUIRED,
     component: 'Input',
     unit: '单位',
-    extra: '这是描述，这是描述，这是描述。',
     componentProps: {
       style: {
         width: '80%'

@@ -12,15 +12,26 @@ interface Props extends ButtonProps {
 function CopyBtn(props: Props) {
   const { text, value } = props;
   const { t } = useTranslation();
-  const [, copyToClipboard] = useClipboard();
+  const [isCopied, error, copyText] = useClipboard();
   const [messageApi, contextHolder] = message.useMessage();
 
-  /** 点击编辑 */
+  useEffect(() => {
+    if (isCopied && !error) {
+      messageApi.success({ content: t('public.copySuccessfully'), key: 'copy'});
+    }
+
+    if (error) {
+      messageApi.warning({ content: error || t('public.copyFailed'), key: 'copy' });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCopied, error]);
+
+  /** 点击处理 */
   const onClick = () => {
     try {
-      copyToClipboard(value);
-      messageApi.success({ content: t('public.copySuccessfully'), key: 'copy' });
+      copyText(value);
     } catch(e) {
+      console.error(e);
       messageApi.warning({ content: t('public.copyFailed'), key: 'copy' });
     }
   };

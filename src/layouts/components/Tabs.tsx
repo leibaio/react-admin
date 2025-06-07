@@ -3,12 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getMenuByKey } from '@/menus/utils/helper';
 import { message, Tabs, Dropdown } from 'antd';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useKeepAliveContext } from 'keepalive-for-react';
+import { useAliveController } from 'react-activation';
 import { useDropdownMenu } from '../hooks/useDropdownMenu';
 import { useCommonStore } from '@/hooks/useCommonStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
-import { useTabsStore } from '@/stores/tabs';
-import { usePublicStore } from '@/stores';
+import { getTabTitle } from '../utils/helper';
+import { setTitle } from '@/utils/helper';
 import styles from '../index.module.less';
 import TabRefresh from './TabRefresh';
 import TabMaximize from './TabMaximize';
@@ -19,7 +20,7 @@ function LayoutTabs() {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const uri = pathname + search;
-  const { refresh } = useKeepAliveContext();
+  const { refresh, dropScope } = useAliveController();
   const [messageApi, contextHolder] = message.useMessage();
   const [time, setTime] = useState<null | NodeJS.Timeout>(null);
   const [isChangeLang, setChangeLang] = useState(false); // 是否切换语言
@@ -27,15 +28,15 @@ function LayoutTabs() {
   const setRefresh = usePublicStore(state => state.setRefresh);
   const {
     tabs,
-    isLock,
+    isCloseTabsLock,
     activeKey, // 选中的标签值
     setActiveKey,
     addTabs,
     closeTabs,
     setNav,
-    toggleLock,
+    toggleCloseTabsLock,
     switchTabsLang,
-  } = useTabsStore(state => state);
+  } = useTabsStore(useShallow(state => state));
 
   // 获取当前语言
   const currentLanguage = i18n.language;
@@ -75,7 +76,8 @@ function LayoutTabs() {
 
   useEffect(() => {
     handleAddTab();
-  }, [handleAddTab, permissions, menuList]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permissions, menuList]);
 
   useEffect(() => {
     switchTabsLang(currentLanguage);
@@ -91,6 +93,8 @@ function LayoutTabs() {
   }, [isChangeLang]);
 
   useEffect(() => {
+    handleSetTitle();
+
     return () => {
       if (time) {
         clearTimeout(time);
@@ -108,16 +112,33 @@ function LayoutTabs() {
   useEffect(() => {
     // 当选中贴标签不等于当前路由则跳转
     if (activeKey !== uri) {
-      const key = isLock ? activeKey : uri;
-      handleAddTab(key);
+      const key = isCloseTabsLock ? activeKey : uri;
+      handleSetTitle();
 
-      if (isLock) {
+      // 如果是关闭标签则直接跳转
+      if (isCloseTabsLock) {
         navigate(key);
-        toggleLock(false);
+        toggleCloseTabsLock(false);
+        handleUpdateBreadcrumb(key);
+      } else {
+        handleAddTab(key);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey, uri]);
+
+  /**
+   * 设置浏览器标签
+   * @param list - 菜单列表
+   * @param path - 路径
+   */
+  const handleSetTitle = useCallback(() => {
+    const path = `${pathname}${search || ''}`;
+    // 通过路由获取标签名
+    const title = getTabTitle(tabs, path);
+    if (title) setTitle(t, title);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   /**
    * 处理更改
@@ -128,11 +149,30 @@ function LayoutTabs() {
   };
 
   /**
+   * 更新面包屑
+   * @param key - 菜单
+   */
+  const handleUpdateBreadcrumb = (key: string) => {
+    if (pathname !== key) {
+      const menuByKeyProps = {
+        menus: menuList,
+        permissions,
+        key
+      };
+      const newItems = getMenuByKey(menuByKeyProps);
+      if (newItems?.key) {
+        navigate(key);
+        setNav(newItems.nav);
+      }
+    }
+  };
+
+  /**
    * 删除标签
    * @param targetKey - 目标key值
    */
   const remove = (targetKey: string) => {
-    closeTabs(targetKey);
+    closeTabs(targetKey, dropScope);
   };
 
   /**
@@ -237,6 +277,7 @@ function LayoutTabs() {
 
   return (
     <div className={`
+      w-[calc(100%-5px)]
       flex
       items-center
       justify-between
@@ -249,7 +290,7 @@ function LayoutTabs() {
         tabs.length > 0 ?
         <Tabs
           hideAdd
-          className="w-full h-30px py-0"
+          className={`w-[calc(100%-110px)] h-30px py-0 ${styles['layout-tabs']}`}
           items={[...tabs]}
           onChange={onChange}
           activeKey={activeKey}

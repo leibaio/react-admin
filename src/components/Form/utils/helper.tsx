@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 import type { FormItemProps } from 'antd';
-import type { ComponentProps, ComponentType, FormList } from '#/form';
+import type { ComponentProps, ComponentType, BaseFormList } from '#/form';
 import { cloneDeep } from 'lodash';
 import { DATE_FORMAT, TIME_FORMAT } from '@/utils/config';
 
@@ -33,19 +33,17 @@ export function initCompProps(
   switch (component) {
     // 下拉框
     case 'Select':
-    return {
-      allowClear: true,
-      showSearch: true,
-      optionFilterProp: 'label',
-      placeholder: t('public.inputPleaseSelect')
-    };
+      return {
+        allowClear: true,
+        showSearch: true,
+        placeholder: t('public.inputPleaseSelect')
+      };
 
     // 树形下拉框
     case 'TreeSelect':
       return {
         allowClear: true,
         showSearch: true,
-        treeNodeFilterProp: 'label',
         placeholder: t('public.inputPleaseSelect')
       };
 
@@ -95,18 +93,59 @@ export function initCompProps(
     default:
       return {
         allowClear: true,
-        placeholder: t('public.inputPleaseEnter')
+        placeholder: t('public.inputPleaseEnter'),
       };
   }
 }
+
+/** 处理上传组件数据格式 */
+const handleUploadData: FormItemProps['getValueFromEvent'] = (e) => {
+  if (Array.isArray(e)) {
+    return e;
+  }
+  return e?.fileList;
+};
 
 /**
  * 过滤表单数据
  * @param data - 表单数据
  */
-export const filterFormItem = (data: FormList): FormItemProps => {
+export const filterFormItem = (data: BaseFormList): FormItemProps => {
   const result = cloneDeep(data);
+  delete result.wrapperWidth;
   delete result.componentProps;
+  delete result.render;
+
+  // 如果当前项时隐藏且存在规则，则移除规则校验
+  if (result.hidden && result.rules?.length) {
+    result.rules = undefined;
+  }
+
+  // 上传组建特殊处理
+  if (result.component === 'Upload' && !result?.getValueFromEvent) {
+    result.getValueFromEvent = handleUploadData;
+  }
 
   return result as FormItemProps;
+};
+
+/**
+ * 过滤空字符串和前后空格
+ * @param values - 表单值
+ */
+export const filterEmptyStr = (values: Record<string, unknown>) => {
+  const params: Record<string, unknown> = {};
+
+  Object.keys(values).forEach(key => {
+    // 去除前后空格
+    if(typeof values[key] === 'string') {
+      values[key] = values[key]?.trim();
+    }
+
+    if (values[key] !== '') {
+      params[key] = values[key];
+    }
+  });
+
+  return params;
 };

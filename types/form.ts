@@ -14,7 +14,7 @@ import type {
   TransferProps,
   FormItemProps,
 } from "antd";
-import type { FC, Key, ReactNode } from "react";
+import type { Key, ReactNode } from "react";
 import type { RangePickerProps } from 'antd/lib/date-picker';
 import type { DefaultOptionType } from 'antd/lib/select';
 import type { RuleObject } from 'antd/lib/form';
@@ -23,7 +23,7 @@ import type { BusinessComponents } from '@/components/Business';
 import type { EditorProps } from '@/components/WangEditor';
 
 // 数据类型
-export type FormData = Record<string, unknown>
+export type BaseFormData = Record<string, unknown>
 
 // 基础数据组件
 type DefaultDataComponents = 'Input' |
@@ -88,14 +88,14 @@ export interface ApiResult extends Omit<DefaultOptionType, 'value'> {
   value?: string | number;
 }
 
-export type ApiFn = (params?: object, params2?: object, params3?: object) => Promise<ServerResult<unknown>>
+export type ApiFn = {
+  <T extends unknown[]>(...params: T): Promise<ServerResult<unknown>>;
+}
 
 // api参数
 interface ApiParam {
   api?: ApiFn;
-  params?: object;
-  params2?: object;
-  params3?: object;
+  params?: object | unknown[];
   apiResultKey?: string;
 }
 
@@ -124,27 +124,47 @@ export type ComponentProps = InputProps |
                               ApiTreeSelectProps |
                               EditorProps
 
+// 组件参数
+export type RenderComponentProps = InputProps &
+                              InputNumberProps &
+                              SelectProps &
+                              TreeSelectProps &
+                              CheckboxProps &
+                              RadioProps &
+                              DatePickerProps &
+                              TimePickerProps &
+                              UploadProps &
+                              RateProps &
+                              SliderSingleProps &
+                              TimeRangePickerProps &
+                              TransferProps &
+                              RangePickerProps &
+                              ApiSelectProps &
+                              ApiTreeSelectProps &
+                              EditorProps
+
 // 表单规则
 export type FormRule = RuleObject & {
   trigger?: 'blur' | 'change' | ['change', 'blur'];
 }
 
 // 表单数据
-export interface FormList extends FormItemProps {
+export interface BaseFormList extends FormItemProps {
   name: string | string[]; // 表单域字段
   label: string; // 标签
   placeholder?: string; // 占位符
   hidden?: boolean; // 是否隐藏
-  unit?: string; // 单位
+  unit?: string; // 单位，无法和extra一起显示
   rules?: FormRule[]; // 规则
   labelWidth?: number; // label宽度
   wrapperWidth?: number; // 内容宽度
   component: ComponentType; // 组件
   componentProps?: ComponentProps; // 组件参数
-  render?: FC; // 自定义渲染
+  render?: (props: RenderComponentProps) => ReactNode; // 自定义渲染
 }
 
 // 搜索数据
-export interface SearchList extends FormList {
+export interface BaseSearchList extends BaseFormList {
+  labelWidth?: number; // 临时使用
   // TODO...
 }

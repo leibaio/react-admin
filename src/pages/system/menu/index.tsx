@@ -1,13 +1,7 @@
-import type { FormData } from '#/form';
+import type { BaseFormData } from '#/form';
 import type { PagePermission } from '#/public';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { searchList, createList, tableColumns } from './model';
 import { type FormInstance, message } from 'antd';
-import { useTranslation } from 'react-i18next';
-import { checkPermission } from '@/utils/permissions';
-import { useCommonStore } from '@/hooks/useCommonStore';
-import { ADD_TITLE, EDIT_TITLE, INIT_PAGINATION } from '@/utils/config';
-import { UpdateBtn, DeleteBtn } from '@/components/Buttons';
+import { searchList, createList, tableColumns } from './model';
 import {
   getMenuPage,
   getMenuById,
@@ -15,13 +9,6 @@ import {
   updateMenu,
   deleteMenu
 } from '@/servers/system/menu';
-import BaseContent from '@/components/Content/BaseContent';
-import BaseSearch from '@/components/Search/BaseSearch';
-import BaseModal from '@/components/Modal/BaseModal';
-import BaseForm from '@/components/Form/BaseForm';
-import BaseTable from '@/components/Table/BaseTable';
-import BasePagination from '@/components/Pagination/BasePagination';
-import BaseCard from '@/components/Card/BaseCard';
 
 // 当前行数据
 interface RowData {
@@ -43,12 +30,12 @@ function Page() {
   const [isCreateLoading, setCreateLoading] = useState(false);
   const [createTitle, setCreateTitle] = useState(ADD_TITLE(t));
   const [createId, setCreateId] = useState('');
-  const [createData, setCreateData] = useState<FormData>(initCreate);
-  const [searchData, setSearchData] = useState<FormData>({});
+  const [createData, setCreateData] = useState<BaseFormData>(initCreate);
+  const [searchData, setSearchData] = useState<BaseFormData>({});
   const [page, setPage] = useState(INIT_PAGINATION.page);
   const [pageSize, setPageSize] = useState(INIT_PAGINATION.pageSize);
   const [total, setTotal] = useState(0);
-  const [tableData, setTableData] = useState<FormData[]>([]);
+  const [tableData, setTableData] = useState<BaseFormData[]>([]);
   const [messageApi, contextHolder] = message.useMessage();
   const { permissions } = useCommonStore();
 
@@ -73,8 +60,8 @@ function Page() {
       const { code, data } = res;
       if (Number(code) !== 200) return;
       const { items, total } = data;
-      setTotal(total);
-      setTableData(items);
+      setTotal(total || 0);
+      setTableData(items || []);
     } finally {
       setFetch(false);
       setLoading(false);
@@ -89,7 +76,7 @@ function Page() {
    * 点击搜索
    * @param values - 表单返回数据
    */
-  const onSearch = (values: FormData) => {
+  const onSearch = (values: BaseFormData) => {
     setPage(1);
     setSearchData(values);
     setFetch(true);
@@ -100,7 +87,8 @@ function Page() {
     if (pagePermission.page) getPage();
     // TODO: 重复请求测试，可删
     if (pagePermission.page) getPage();
-  }, [getPage, pagePermission.page]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagePermission.page]);
 
   /** 点击新增 */
   const onCreate = () => {
@@ -120,7 +108,7 @@ function Page() {
       setCreateTitle(EDIT_TITLE(t, id));
       setCreateId(id);
       setCreateLoading(true);
-      const { code, data } = await getMenuById(id as string);
+      const { code, data } = await getMenuById(id);
       if (Number(code) !== 200) return;
       setCreateData(data);
     } finally {
@@ -142,7 +130,7 @@ function Page() {
    * 新增/编辑提交
    * @param values - 表单返回数据
    */
-  const handleCreate = async (values: FormData) => {
+  const handleCreate = async (values: BaseFormData) => {
     try {
       setCreateLoading(true);
       const functions = () => createId ? updateMenu(createId, values) : createMenu(values);
@@ -163,7 +151,7 @@ function Page() {
   const onDelete = async (id: string) => {
     try {
       setLoading(true);
-      const { code, message } = await deleteMenu(id as string);
+      const { code, message } = await deleteMenu(id);
       if (Number(code) === 200) {
         messageApi.success(message || t('public.successfullyDeleted'));
         getPage();
@@ -195,7 +183,6 @@ function Page() {
         pagePermission.update === true &&
         <UpdateBtn
           className='mr-5px'
-          isLoading={isLoading}
           onClick={() => onUpdate((record as RowData).id)}
         />
       }
@@ -203,7 +190,6 @@ function Page() {
         pagePermission.delete === true &&
         <DeleteBtn
           className='mr-5px'
-          isLoading={isLoading}
           handleDelete={() => onDelete((record as RowData).id)}
         />
       }

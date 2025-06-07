@@ -1,4 +1,4 @@
-import type { ApiSelectProps } from './types';
+import type { ApiPageSelectProps } from './types';
 import type { DefaultOptionType } from 'antd/es/select';
 import { Select } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -9,22 +9,34 @@ import Loading from './components/Loading';
 /**
  * @description: 根据API获取数据下拉组件
  */
-function ApiSelect(props: ApiSelectProps) {
+function ApiPageSelect(props: ApiPageSelectProps) {
+  const {
+    pageKey = 'page',
+    pageSizeKey = 'pageSize',
+    pageSize = 20,
+  } = props;
   const { t } = useTranslation();
   const [isLoading, setLoading] = useState(false);
   const [options, setOptions] = useState<DefaultOptionType[]>([]);
 
   // 清除自定义属性
-  const params: Partial<ApiSelectProps> = { ...props };
+  const params: Partial<ApiPageSelectProps> = { ...props };
   delete params.api;
   delete params.params;
   delete params.apiResultKey;
+  delete params.pageKey;
+  delete params.pageSizeKey;
 
   /** 获取接口数据 */
   const getApiData = useCallback(async () => {
     if (!props.api) return;
     try {
       const { api, params, apiResultKey } = props;
+
+      if (typeof params === 'object' && !Array.isArray(params)) {
+        params[pageKey] = 1;
+        params[pageSizeKey] = pageSize;
+      }
 
       setLoading(true);
       if (api) {
@@ -37,7 +49,7 @@ function ApiSelect(props: ApiSelectProps) {
     } finally {
       setLoading(false);
     }
-  }, [props]);
+  }, [pageKey, pageSize, pageSizeKey, props]);
 
   useEffect(() => {
     // 当有值且列表为空时，自动获取接口
@@ -73,4 +85,4 @@ function ApiSelect(props: ApiSelectProps) {
   );
 }
 
-export default ApiSelect;
+export default ApiPageSelect;

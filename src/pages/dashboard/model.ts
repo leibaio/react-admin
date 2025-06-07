@@ -1,9 +1,10 @@
-import type { FormList } from "#/form";
+import type { ApiFn, BaseFormList } from "#/form";
 import type { TFunction } from "i18next";
 import { getGames } from '@/servers/platform/game';
+import { getPartnerDemo } from "@/servers/platform/partner";
 
 // 搜索数据
-export const searchList = (t: TFunction): FormList[] => [
+export const searchList = (t: TFunction): BaseFormList[] => [
   {
     label: t('public.date'),
     name: 'pay_date',
@@ -30,10 +31,29 @@ export const searchList = (t: TFunction): FormList[] => [
     wrapperWidth: 200,
     component: 'ApiSelect',
     componentProps: {
-      api: getGames,
+      api: getGames as ApiFn,
       params: {
         isAll: true
       },
+      fieldNames: {
+        label: 'name',
+        value: 'id'
+      }
+    }
+  },
+  {
+    label: t('dashboard.cooperativeCompany') + '2',
+    name: 'partners2',
+    wrapperWidth: 200,
+    component: 'ApiSelect',
+    componentProps: {
+      api: getPartnerDemo as ApiFn,
+      params: [
+        '/platform/partner',
+        {
+          isAll: true
+        }
+      ],
       fieldNames: {
         label: 'name',
         value: 'id'

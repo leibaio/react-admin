@@ -154,14 +154,6 @@ export function searchMenuValue(data: SearchMenuProps): SideMenu[] {
   return result;
 }
 
-/**
- * 根据key获取菜单当前值
- * @param menus - 菜单
- * @param permissions - 权限列表
- * @param key - 路由值
- * @param fatherNav - 父级面包屑
- * @param result - 返回值
- */
 export interface NavData {
   label: string;
   labelZh: string;
@@ -182,6 +174,14 @@ interface GetMenuByKeyProps {
   result?: GetMenuByKeyResult
 }
 
+/**
+ * 根据key获取菜单当前值
+ * @param menus - 菜单
+ * @param permissions - 权限列表
+ * @param key - 路由值
+ * @param fatherNav - 父级面包屑
+ * @param result - 返回值
+ */
 export function getMenuByKey(data: GetMenuByKeyProps): GetMenuByKeyResult | undefined {
   const { menus, permissions, key } = data;
   const lang = localStorage.getItem(LANG);
@@ -360,7 +360,8 @@ export function getFirstMenu(
     // 有权限且没有有子数据
     if (
       hasPermission(menus[i], permissions) &&
-      !hasChildren(menus[i])
+      !hasChildren(menus[i]) &&
+      !result
     ) result = menus[i].key;
   }
 
@@ -428,24 +429,6 @@ export function handleFilterMenus(menus: SideMenu[], level = 0): SideMenu[] {
   }
 
   return currentItem;
-}
-
-/**
- * 转换为导航所需格式
- * @param list - 标题队列
- */
-export function handleFilterNav(list: string[]): NavData[] {
-  const result: NavData[] = [];
-
-  for (let i = 0; i < list?.length; i++) {
-    const item = list[i];
-    result.push({
-      label: item,
-      labelZh: item,
-      labelEn: item,
-    });
-  }
-  return result;
 }
 
 /**

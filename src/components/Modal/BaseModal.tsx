@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import type { MouseEventHandler, ReactNode, RefObject } from 'react';
 import type { ModalProps } from 'antd';
 import type { DraggableData, DraggableEvent } from 'react-draggable';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Tooltip } from 'antd';
 import { Icon } from '@iconify/react';
 import { useTranslation } from 'react-i18next';
+import { useCommonStore } from '@/hooks/useCommonStore';
 import Draggable from 'react-draggable';
 import './index.less';
 
@@ -15,22 +16,35 @@ interface Props extends Omit<ModalProps, 'onCancel'> {
 function BaseModal(props: Props) {
   const { width, children, wrapClassName, onCancel } = props;
   const { t } = useTranslation();
+  const { isPhone } = useCommonStore();
   const [isDisabled, setDisabled] = useState(true);
   const [isFullscreen, setFullscreen] = useState(false);
   const [bounds, setBounds] = useState({ left: 0, top: 0, bottom: 0, right: 0 });
+  const [cacheBounds, setCacheBounds] = useState({ left: 0, top: 0, bottom: 0, right: 0 });
   const draggleRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isFullscreen) {
+      setBounds({ left: 0, top: 0, bottom: 0, right: 0 });
+    } else {
+      setBounds(cacheBounds);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen]);
 
   /** 开始拖拽对话框 */
   const onStartMouse = (_event: DraggableEvent, uiData: DraggableData) => {
     const { clientWidth, clientHeight } = window.document.documentElement;
     const targetRect = draggleRef.current?.getBoundingClientRect?.();
     if (!targetRect) return;
-    setBounds({
+    const data = {
       left: -targetRect.left + uiData.x,
       right: clientWidth - (targetRect.right - uiData.x),
       top: -targetRect.top + uiData.y,
       bottom: clientHeight - (targetRect.bottom - uiData.y),
-    });
+    };
+    setBounds(data);
+    setCacheBounds(data);
   };
 
   /** 鼠标拖拽结束 */
@@ -42,10 +56,13 @@ function BaseModal(props: Props) {
 
   /** 最大化 */
   const onFullscreen = () => {
-    setFullscreen(value => {
-      if (!value) setBounds({ left: 0, top: 0, bottom: 0, right: 0 });
-      return !value;
-    });
+    setFullscreen(!isFullscreen);
+  };
+
+  /** 点击关闭 */
+  const handleCancel: MouseEventHandler<HTMLDivElement> = (e) => {
+    e.stopPropagation();
+    onCancel?.();
   };
 
   /** 自定义关闭和放大图标 */
@@ -72,7 +89,7 @@ function BaseModal(props: Props) {
       >
         <div
           className='p-10px mt-3px cursor-pointer'
-          onClick={() => onCancel?.()}
+          onClick={handleCancel}
         >
           <Icon
             className="text-lg"
@@ -94,9 +111,6 @@ function BaseModal(props: Props) {
         { props.title || '' }
       </span>
 
-      <div>
-
-      </div>
       { CloseRender() }
     </div>
   );
@@ -104,6 +118,7 @@ function BaseModal(props: Props) {
   /** 自定义渲染对话框 */
   const modalRender = (modal: ReactNode) => (
     <Draggable
+      nodeRef={draggleRef as RefObject<HTMLElement>}
       disabled={isDisabled}
       onStart={onStartMouse}
       bounds={isFullscreen ? undefined : bounds}
@@ -120,7 +135,7 @@ function BaseModal(props: Props) {
       destroyOnClose
       closable={false}
       maskClosable={false}
-      modalRender={modalRender}
+      modalRender={!isPhone ? modalRender : undefined}
       okText={t('public.ok')}
       cancelText={t('public.cancel')}
       {...props}
@@ -129,7 +144,9 @@ function BaseModal(props: Props) {
       wrapClassName={isFullscreen ? 'full-modal' : wrapClassName || ''}
       width={isFullscreen ? '100%' : width || 520}
     >
-      { children }
+      <div className='base-modal-content'>
+        { children }
+      </div>
     </Modal>
   );
 }

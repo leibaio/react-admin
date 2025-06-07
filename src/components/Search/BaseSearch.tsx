@@ -1,20 +1,24 @@
 import type { ColProps, FormInstance } from 'antd';
-import type { FormData, FormList, SearchList } from '#/form';
-import { type LegacyRef, ReactNode, forwardRef, useEffect, useState } from 'react';
+import type { BaseFormData, BaseFormList, BaseSearchList } from '#/form';
+import { type CSSProperties, type ReactNode, type Ref, forwardRef, useEffect, useState } from 'react';
 import { type FormProps, Button, Col, Flex } from 'antd';
 import { Form } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { filterDayjs } from '@/components/Dates';
+import { useCommonStore } from '@/hooks/useCommonStore';
 import { getComponent } from '@/components/Form/utils/componentMap';
-import { handleValuePropName } from '@/components/Form/utils/helper';
-import { SearchOutlined, ClearOutlined, DownOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, DownOutlined } from '@ant-design/icons';
+import { filterEmptyStr, filterFormItem, handleValuePropName } from '@/components/Form/utils/helper';
 
 interface Props extends FormProps {
-  list: SearchList[];
-  data: FormData;
+  list: BaseSearchList[];
+  data: BaseFormData;
   isLoading?: boolean;
   isSearch?: boolean;
-  isClear?: boolean;
+  isReset?: boolean;
+  style?: CSSProperties;
+  className?: string;
+  type?: 'default' | 'grid';
   children?: ReactNode;
   labelCol?: Partial<ColProps>;
   wrapperCol?: Partial<ColProps>;
@@ -24,14 +28,18 @@ interface Props extends FormProps {
   handleFinish: FormProps['onFinish'];
 }
 
-const BaseSearch = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
+const BaseSearch = forwardRef((props: Props, ref: Ref<FormInstance>) => {
   const {
     list,
     data,
+    initialValues,
     isLoading,
     isSearch = true,
-    isClear = true,
+    isReset = true,
     isRowExpand = true,
+    type = 'default',
+    style,
+    className,
     children,
     labelCol,
     wrapperCol,
@@ -40,8 +48,10 @@ const BaseSearch = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
     handleFinish
   } = props;
   const { t } = useTranslation();
+  const { isPhone } = useCommonStore();
   const [form] = Form.useForm();
   const [isExpand, setExpand] = useState(false);
+  const [isFirst, setFirst] = useState(true);
   const [isShowExpand, setShowExpand] = useState(isRowExpand);
 
   useEffect(() => {
@@ -51,12 +61,26 @@ const BaseSearch = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
       const showNum = defaultColCount * defaultRowExpand;
       setShowExpand(showNum < list.length);
     }
-  }, [defaultColCount, defaultRowExpand, isRowExpand, list.length]);
+  }, [defaultColCount, defaultRowExpand, isPhone, isRowExpand, list.length]);
+
+  // 初始化内容
+  useEffect(() => {
+    try {
+      if (Object.keys(data).length) {
+        setFirst(false);
+        form.setFieldsValue({ ...data });
+      }
+    } catch (e) {
+      console.error(e);
+      console.warn('传入的搜索数据不是一个对象');
+    }
+  }, [data, form, isFirst]);
 
   // 清除多余参数
   const formProps = { ...props };
+  delete formProps.type;
   delete formProps.isSearch;
-  delete formProps.isClear;
+  delete formProps.isReset;
   delete formProps.isLoading;
   delete formProps.handleFinish;
 
@@ -65,10 +89,10 @@ const BaseSearch = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
     form?.submit();
   };
 
-  /** 点击清除 */
-  const onClear = () => {
+  /** 点击重置 */
+  const onReset = () => {
     form?.resetFields();
-    form?.setFieldsValue(data ? { ...data } : {});
+    form?.setFieldsValue(initialValues ? { ...initialValues } : {});
     form?.submit();
   };
 
@@ -86,7 +110,7 @@ const BaseSearch = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
    * 处理列表
    * @param list - 列表
    */
-  const filterList = (list: SearchList[]) => {
+  const filterList = (list: BaseSearchList[]) => {
     if (!isShowExpand) return list;
 
     // 默认显示个数
@@ -107,25 +131,27 @@ const BaseSearch = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
   };
 
   /** 获取表单label宽度 */
-  const getLabelCol = (item?: SearchList) => {
+  const getLabelCol = (item?: BaseSearchList) => {
     if (item?.labelWidth) {
       return { style: { width: item.labelWidth } };
     }
 
     if (item?.labelCol) return item.labelCol;
+    if (labelCol) return labelCol;
 
-    return labelCol ? labelCol : { span: 6 };
+    return type === 'grid' && !isPhone ? { span: 6 } : undefined;
   };
 
   /** 获取输入间隙 */
-  const getWrapperCol = (item?: SearchList) => {
+  const getWrapperCol = (item?: BaseSearchList) => {
     if (item?.wrapperWidth) {
       return { style: { width: item.wrapperWidth } };
     }
 
     if (item?.wrapperCol) return item.wrapperCol;
+    if (wrapperCol) return wrapperCol;
 
-    return wrapperCol ? wrapperCol : { span: 18 };
+    return type === 'grid' && !isPhone ? { span: 18 } : undefined;
   };
 
   /**
@@ -135,7 +161,9 @@ const BaseSearch = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
   const onFinish: FormProps['onFinish'] = values => {
     if (handleFinish) {
       // 将dayjs类型转为字符串
-      const params = filterDayjs(values, list as FormList[]);
+      let params = filterDayjs(values, list as BaseFormList[]);
+      // 过滤空字符串和前后空格
+      params = filterEmptyStr(params);
       handleFinish?.(params);
     }
   };
@@ -148,90 +176,121 @@ const BaseSearch = forwardRef((props: Props, ref: LegacyRef<FormInstance>) => {
     console.warn('搜索错误:', errorInfo);
   };
 
+  /** 渲染按钮列表 */
+  const renderBtnList = (
+    <div className='flex items-center flex-wrap gap-10px'>
+      {
+        !!isSearch &&
+        <Button
+          type='primary'
+          htmlType='submit'
+          className={`!mb-5px ${isPhone ? 'mr-5px' : ''}`}
+          loading={isLoading}
+          icon={<SearchOutlined />}
+        >
+          { t('public.search') }
+        </Button>
+      }
+
+      {
+        !!isReset &&
+        <Button
+          className={`!mb-5px ${isPhone ? 'mr-5px' : ''}`}
+          icon={<ReloadOutlined />}
+          onClick={onReset}
+        >
+          { t('public.reset') }
+        </Button>
+      }
+
+      {
+        children &&
+        <div className={`!mb-5px ${isPhone ? 'mr-5px' : ''}`}>
+          { children }
+        </div>
+      }
+
+      {
+        type === 'grid' &&
+        !!isShowExpand &&
+        <div
+          className='text-12px cursor-pointer color-#1677ff hover:color-#69b1ff'
+          onClick={() => {
+            setExpand(!isExpand);
+          }}
+        >
+          <DownOutlined rotate={ isExpand ? 180 : 0 } />
+          { isExpand ? '收缩' : '展开' }
+        </div>
+      }
+    </div>
+  );
+
   return (
-    <div id="searches">
+    <div
+      id="searches"
+      style={style}
+      className={className}
+    >
       <Form
-        layout="inline"
+        layout={isPhone ? 'horizontal' : 'inline'}
         {...formProps}
         ref={ref}
         form={form}
-        initialValues={data}
         onFinish={onFinish}
         onFinishFailed={onFinishFailed}
         autoComplete="off"
       >
-        <Flex wrap className='w-full'>
-          {
-            filterList(list)?.map(item => (
-              <div
-                key={`${item.name}`}
-                style={{ width: item.hidden ? 0 : `${100 / defaultColCount}%` }}
-              >
+        {
+          type === 'default' &&
+          <>
+            {
+              list?.map(item => (
                 <Form.Item
-                  label={item.label}
-                  name={item.name}
-                  className='!mb-5px'
-                  hidden={item.hidden}
+                  {...filterFormItem(item)}
+                  key={`${item.name}`}
+                  className={`${item?.className || ''} !mb-5px`}
                   labelCol={getLabelCol(item)}
                   wrapperCol={getWrapperCol(item)}
-                  rules={item.rules}
                   valuePropName={handleValuePropName(item.component)}
                 >
                   { getComponent(t, item, onPressEnter) }
                 </Form.Item>
-              </div>
-            ))
-          }
+              ))
+            }
+            { renderBtnList }
+          </>
+        }
 
-          <Col flex={getFlexCol()}>
-            <Flex justify='flex-end'>
-              <div className='flex items-center flex-wrap'>
-                {
-                  !!isSearch &&
-                  <Form.Item>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      className='!mb-5px'
-                      loading={isLoading}
-                      icon={<SearchOutlined />}
-                    >
-                      { t('public.search') }
-                    </Button>
-                  </Form.Item>
-                }
-
-                {
-                  !!isClear &&
-                  <Form.Item>
-                    <Button
-                      className='!mb-5px'
-                      icon={<ClearOutlined />}
-                      onClick={onClear}
-                    >
-                      { t('public.clear') }
-                    </Button>
-                  </Form.Item>
-                }
-
-                { children }
-
-                {
-                  !!isShowExpand &&
-                  <div
-                    className='text-12px cursor-pointer color-#1677ff hover:color-#69b1ff'
-                    onClick={() => {
-                      setExpand(!isExpand);
-                    }}
+        {
+          type === 'grid' &&
+          <Flex wrap className='w-full'>
+            {
+              filterList(list)?.map(item => (
+                <div
+                  key={`${item.name}`}
+                  style={{ width: item.hidden ? 0 : `${100 / (isPhone ? 1 : defaultColCount)}%` }}
+                >
+                  <Form.Item
+                    {...filterFormItem(item)}
+                    className={`${item?.className || ''} !mb-5px`}
+                    labelCol={getLabelCol(item)}
+                    wrapperCol={getWrapperCol(item)}
+                    valuePropName={handleValuePropName(item.component)}
                   >
-                    <DownOutlined rotate={ isExpand ? 180 : 0 } />
-                    { isExpand ? '收缩' : '展开' }
-                  </div>
-                }
-              </div>
-            </Flex>
-          </Col>
-        </Flex>
+                    { getComponent(t, item, onPressEnter) }
+                  </Form.Item>
+                </div>
+              ))
+            }
+
+            <Col flex={getFlexCol()}>
+              <Flex justify='flex-end'>
+                { renderBtnList }
+              </Flex>
+            </Col>
+          </Flex>
+        }
       </Form>
     </div>
   );
